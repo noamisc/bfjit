@@ -31,7 +31,7 @@ static inline bool jit_memory_alloc(Jit_Memory *jit_mem)
 static inline bool jit_memory_dealloc(Jit_Memory *jit_mem)
 {
 #ifdef _WIN32
-    return VirtualFree(map, 0, MEM_RELEASE) != 0;
+    return VirtualFree(jit_mem->data, 0, MEM_RELEASE) != 0;
 #else
     return munmap(jit_mem->data, jit_mem->size) == 0;
 #endif
@@ -56,6 +56,15 @@ Bf_VM bf_vm_init(Bf_IRs *irs)
             .size = 30000
         },
     };
+}
+
+void bf_vm_deinit(Bf_VM *vm)
+{
+    if (vm->codegen.call_stack.items) da_free(&vm->codegen.call_stack);
+    if (vm->codegen.code.items) sb_free(&vm->codegen.code);
+    if (!jit_memory_invalid(&vm->jit_mem)) jit_memory_dealloc(&vm->jit_mem);
+    if (vm->tape.data) bf_tape_dealloc(&vm->tape);
+
 }
 
 // used by the interpreter
@@ -133,7 +142,10 @@ bool bf_vm_interpret(Bf_VM *vm)
     return true;
 }
 
-bool bf_vm_jit_compile(Bf_VM *vm)
+/*
+  // old
+
+  bool bf_vm_jit_compile(Bf_VM *vm)
 {
     bool result = true;
 
@@ -169,12 +181,50 @@ bool bf_vm_jit_compile(Bf_VM *vm)
 
     void (*program)(void *) = vm->jit_mem.data;
     program(vm->tape.data);
-    printf("boom\n");
 
 defer:
     if (!jit_memory_invalid(&vm->jit_mem)) jit_memory_dealloc(&vm->jit_mem);
-    printf("kaboom\n");
     if (vm->tape.data) bf_tape_dealloc(&vm->tape);
-    printf("kapow!\n");
+    return result;
+}
+ */
+
+bool bf_vm_jit_compile(Bf_VM *vm)
+{
+    bool result = true;
+
+    vm->codegen = generate_code(vm->irs);
+    vm->jit_mem.size = vm->codegen.code.count;
+
+    if (!jit_memory_alloc(&vm->jit_mem)) {
+        basic_return_defer(false);
+    }
+
+    if (!bf_tape_alloc(&vm->tape)) {
+        basic_return_defer(false);
+    }
+
+    memcpy(vm->jit_mem.data, vm->codegen.code.items, vm->codegen.code.count);
+
+    for (size_t i = 0; i < vm->codegen.call_stack.count; i++) {
+        Call call = vm->codegen.call_stack.items[i];
+        uintptr_t fn;
+
+        switch (call.kind) {
+            case CALL_PUT:
+                fn = (uintptr_t)putchar;
+                break;
+            case CALL_GET:
+                fn = (uintptr_t)getchar;
+                break;
+        }
+
+        memcpy(vm->jit_mem.data + call.pos, &fn, sizeof(fn));
+    }
+
+    void (*program)(void *) = vm->jit_mem.data;
+    program(vm->tape.data);
+
+defer:
     return result;
 }

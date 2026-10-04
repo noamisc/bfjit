@@ -22,6 +22,7 @@ typedef struct {
 } Bf_VM;
 
 Bf_VM bf_vm_init(Bf_IRs *irs);
+void bf_vm_deinit(Bf_VM *vm);
 bool bf_vm_interpret(Bf_VM *vm);
 bool bf_vm_jit_compile(Bf_VM *vm);
 

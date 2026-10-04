@@ -16,15 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define basic_assert(expr, message) basic__assert(expr, __FILE__, __LINE__, __func__, message)
-#define basic_assertf(expr, fmt, ...) basic__assertf(expr, __FILE__, __LINE__, __func__, fmt, __VA_ARGS__)
-#define basic_panic(message) basic__panic(__FILE__, __LINE__, __func__, message)
-#define basic_panicf(fmt, ...) basic__panicf(__FILE__, __LINE__, __func__, fmt, __VA_ARGS__)
-
-BASICDEF void basic__assert(bool expr, const char *file, size_t line, const char *func, const char *message);
-BASICDEF void basic__assertf(bool expr, const char *file, size_t line, const char *func, const char *fmt, ...);
-BASICDEF void basic__panic(const char *file, size_t line, const char *func, const char *message);
-BASICDEF void basic__panicf(const char *file, size_t line, const char *func, const char *fmt, ...);
+BASICDEF void basic_assert(bool expr, const char *fmt, ...);
+BASICDEF void basic_panic(const char *fmt, ...);
 
 #define basic_return_defer(value) do {result = (value); goto defer;} while(0)
 // tsoding/nob.h's nob_shift() and nob_shift_args()
@@ -177,43 +170,26 @@ BASICDEF bool basic_read_file(const char *path, Basic_String_Builder *sb);
 #include <stdarg.h>
 #include <stdio.h>
 
-BASICDEF void basic__panic(const char *file, size_t line, const char *func, const char *message)
-{
-    fprintf(stderr, "%s:%zu: %s: %s\n", file, line, func, message);
-    abort();
-}
-
-BASICDEF void basic__panicf(const char *file, size_t line, const char *func, const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    fprintf(stderr, "%s:%zu: %s: ", file, line, func);
-    vfprintf(stderr, fmt, ap);
-    putc('\n', stderr);
-    va_end(ap);
-    abort();
-}
-
-BASICDEF void basic__assert(bool expr, const char *file, size_t line, const char *func, const char *message)
-{
-    if (!expr) {
-        basic__panic(file, line, func, message);
-    }
-}
-
-BASICDEF void basic__assertf(bool expr, const char *file, size_t line, const char *func, const char *fmt, ...)
+BASICDEF void basic_assert(bool expr, const char *fmt, ...)
 {
     if (!expr) {
         va_list ap;
         va_start(ap, fmt);
-
-        fprintf(stderr, "%s:%zu: %s: ", file, line, func);
         vfprintf(stderr, fmt, ap);
-        putc('\n', stderr);
-
         va_end(ap);
+        putc('\n', stderr);
         abort();
     }
+}
+
+BASICDEF void basic_panic(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    putc('\n', stderr);
+    abort();
 }
 
 BASICDEF void basic_sb_append_char(Basic_String_Builder *sb, char c)
@@ -339,5 +315,4 @@ defer:
 }
 
 #endif // BASIC_IMPLEMENTED
-
 #endif // BASIC_IMPLEMENTATION

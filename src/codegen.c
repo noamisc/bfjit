@@ -14,6 +14,18 @@ static inline void code_emit_u32(String_Builder *code, uint32_t val)
     code_emit_u8(code, (uint8_t)(val >> 24));
 }
 
+static inline void code_emit_u64(String_Builder *code, uint64_t val)
+{
+    code_emit_u8(code, (uint8_t)(val >> 0));
+    code_emit_u8(code, (uint8_t)(val >> 8));
+    code_emit_u8(code, (uint8_t)(val >> 16));
+    code_emit_u8(code, (uint8_t)(val >> 24));
+    code_emit_u8(code, (uint8_t)(val >> 32));
+    code_emit_u8(code, (uint8_t)(val >> 40));
+    code_emit_u8(code, (uint8_t)(val >> 48));
+    code_emit_u8(code, (uint8_t)(val >> 56));
+}
+
 static void code_init(Codegen *codegen)
 {
     switch (get_target_arch()) {
@@ -108,7 +120,10 @@ static void code_emit_sub(Codegen *codegen, size_t operand)
     }
 }
 
-static void code_emit_put(Codegen *codegen, size_t operand)
+/*
+  // old
+
+  static void code_emit_put(Codegen *codegen, size_t operand)
 {
     for (size_t i = 0; i < operand; i++) {
         switch (get_target_arch()) {
@@ -117,6 +132,8 @@ static void code_emit_put(Codegen *codegen, size_t operand)
                     case OS_WINDOWS: {
                         // movzx rcx, byte[rbx]
                         code_emit_str(&codegen->code, "\x48\x0F\xB6\x0B");
+                        // sub rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xEC\x20");
                     } break;
                     case OS_MACOS:
                     case OS_LINUX: {
@@ -124,10 +141,18 @@ static void code_emit_put(Codegen *codegen, size_t operand)
                         code_emit_str(&codegen->code, "\x48\x0F\xB6\x3B");
                     } break;
                 }
+
                 // call 0x00000000
                 code_emit_u8(&codegen->code, '\xE8');
                 da_append(&codegen->call_stack, ((Call){CALL_PUT, codegen->code.count}));
                 code_emit_u32(&codegen->code, 0);
+
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // add rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xC4\x20");
+                    } break;
+                }
             } break;
         }
     }
@@ -138,12 +163,94 @@ static void code_emit_get(Codegen *codegen, size_t operand)
     for (size_t i = 0; i < operand; i++) {
         switch (get_target_arch()) {
             case ARCH_X64: {
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // sub rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xEC\x20");
+                    } break;
+                }
+
                 // call 0x00000000
                 code_emit_u8(&codegen->code, '\xE8');
                 da_append(&codegen->call_stack, ((Call){CALL_GET, codegen->code.count}));
                 code_emit_u32(&codegen->code, 0);
                 // mov [rbx], al
                 code_emit_str(&codegen->code, "\x88\x03");
+
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // add rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xC4\x20");
+                    } break;
+                }
+            } break;
+        }
+    }
+}
+ */
+
+static void code_emit_put(Codegen *codegen, size_t operand)
+{
+    for (size_t i = 0; i < operand; i++) {
+        switch (get_target_arch()) {
+            case ARCH_X64: {
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // movzx rcx, byte[rbx]
+                        code_emit_str(&codegen->code, "\x48\x0F\xB6\x0B");
+                        // sub rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xEC\x20");
+                    } break;
+                    case OS_MACOS:
+                    case OS_LINUX: {
+                        // movzx rdi, byte[rbx]
+                        code_emit_str(&codegen->code, "\x48\x0F\xB6\x3B");
+                    } break;
+                }
+
+                // mov rax, 0x00000000
+                code_emit_str(&codegen->code, "\x48\xB8");
+                da_append(&codegen->call_stack, ((Call){CALL_PUT, codegen->code.count}));
+                code_emit_u64(&codegen->code, 0);
+                // call rax
+                code_emit_str(&codegen->code, "\xFF\xD0");
+
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // add rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xC4\x20");
+                    } break;
+                }
+            } break;
+        }
+    }
+}
+
+static void code_emit_get(Codegen *codegen, size_t operand)
+{
+    for (size_t i = 0; i < operand; i++) {
+        switch (get_target_arch()) {
+            case ARCH_X64: {
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // sub rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xEC\x20");
+                    } break;
+                }
+
+                // mov rax, 0x00000000
+                code_emit_str(&codegen->code, "\x48\xB8");
+                da_append(&codegen->call_stack, ((Call){CALL_GET, codegen->code.count}));
+                code_emit_u64(&codegen->code, 0);
+                // call rax
+                code_emit_str(&codegen->code, "\xFF\xD0");
+
+                switch (get_target_os()) {
+                    case OS_WINDOWS: {
+                        // add rsp, 32
+                        code_emit_str(&codegen->code, "\x48\x83\xC4\x20");
+                    } break;
+                }
             } break;
         }
     }
@@ -172,12 +279,14 @@ static void code_emit_jnz(Codegen *codegen)
             // jnz
             code_emit_str(&codegen->code, "\x0F\x85");
 
-            size_t jz_addr = da_pop(&codegen->bracket_pos);
-            int32_t jz_operand = (int32_t)(codegen->code.count - jz_addr);
-            memcpy(codegen->code.items + jz_addr, &jz_operand, sizeof(jz_operand));
+            size_t jz_op_addr = da_pop(&codegen->bracket_pos);
+            int32_t jnz_op_addr = codegen->code.count;
 
-            int32_t jnz_operand = (int32_t)jz_addr - (int32_t)codegen->code.count;
-            code_emit_u32(&codegen->code, (uint32_t)jnz_operand);
+            int32_t jz_op = (int32_t)(jnz_op_addr - jz_op_addr);
+            int32_t jnz_op = (int32_t)((jz_op_addr - 2) - (jnz_op_addr + 4));
+
+            memcpy(codegen->code.items + jz_op_addr, &jz_op, sizeof(jz_op));
+            code_emit_u32(&codegen->code, (uint32_t)jnz_op);
         } break;
     }
 }
@@ -231,5 +340,6 @@ Codegen generate_code(Bf_IRs *irs)
     }
 
     code_eof(&codegen);
+    code_deinit(&codegen);
     return codegen;
 }
