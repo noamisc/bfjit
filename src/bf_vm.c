@@ -142,53 +142,6 @@ bool bf_vm_interpret(Bf_VM *vm)
     return true;
 }
 
-/*
-  // old
-
-  bool bf_vm_jit_compile(Bf_VM *vm)
-{
-    bool result = true;
-
-    vm->codegen = generate_code(vm->irs);
-    vm->jit_mem.size = vm->codegen.code.count;
-
-    if (!jit_memory_alloc(&vm->jit_mem)) {
-        basic_return_defer(false);
-    }
-
-    if (!bf_tape_alloc(&vm->tape)) {
-        basic_return_defer(false);
-    }
-
-    memcpy(vm->jit_mem.data, vm->codegen.code.items, vm->codegen.code.count);
-
-    for (size_t i = 0; i < vm->codegen.call_stack.count; i++) {
-        size_t pos = vm->codegen.call_stack.items[i].pos;
-        uint8_t *next = vm->jit_mem.data + pos + 4;
-        int32_t offset;
-
-        switch (vm->codegen.call_stack.items[i].kind) {
-            case CALL_PUT:
-                offset = (int32_t)((intptr_t)putchar - (intptr_t)next);
-                break;
-            case CALL_GET:
-                offset = (int32_t)((intptr_t)getchar - (intptr_t)next);
-                break;
-        }
-
-        memcpy(vm->jit_mem.data + pos, &offset, sizeof(offset));
-    }
-
-    void (*program)(void *) = vm->jit_mem.data;
-    program(vm->tape.data);
-
-defer:
-    if (!jit_memory_invalid(&vm->jit_mem)) jit_memory_dealloc(&vm->jit_mem);
-    if (vm->tape.data) bf_tape_dealloc(&vm->tape);
-    return result;
-}
- */
-
 bool bf_vm_jit_compile(Bf_VM *vm)
 {
     bool result = true;
