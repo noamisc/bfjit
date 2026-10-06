@@ -137,8 +137,6 @@ bool bf_vm_interpret(Bf_VM *vm)
         }
     }
 
-
-    bf_tape_dealloc(&vm->tape);
     return true;
 }
 
