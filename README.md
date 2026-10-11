@@ -1,7 +1,5 @@
 # bfjit
-Simple Brainfuck JIT implementation in C
+Simple Brainfsck JIT implementation in C
 
-## Compile
-```
-cc bfjit.c -o bfjit
-```
+## TODO
+- [ ] Support AArch64
