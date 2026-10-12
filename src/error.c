@@ -40,7 +40,7 @@ void error_print(Error *error, const char *path, String_View source)
 
     fprintf(stderr, "%s:%zu:%zu: %s\n", path, loc.line, loc.col, error->reason);
     fprintf(stderr, "%*s |\n", width, "");
-    fprintf(stderr, "%zu | %.*s\n", loc.line, end - start, &source.data[start]);
+    fprintf(stderr, "%zu | %.*s\n", loc.line, (int)(end - start), &source.data[start]);
     fprintf(stderr, "%*s | ", width, "");
 
     for (size_t i = start; i < error->pos; i++) {

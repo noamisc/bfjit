@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     }
 
     if (command == CMD_INTERPRET || command == CMD_JIT_COMPILE) {
-        for (size_t i = 2; i < argc; i++) {
+        for (int i = 2; i < argc; i++) {
             if (argv[i][0] == '-') {
                 if (strcmp(argv[1], "--info") == 0) {
                     info = true;
@@ -118,6 +118,7 @@ int main(int argc, char **argv)
         case CMD_JIT_COMPILE:
             bf_vm_jit_compile(&bf_vm);
             break;
+        default: basic_unreachable();
     }
 
 defer:

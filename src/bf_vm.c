@@ -9,6 +9,8 @@
 
 #include "bf_vm.h"
 
+typedef void (*Bf_Program)(void *);
+
 static inline bool jit_memory_invalid(Jit_Memory *jit_mem)
 {
 #ifdef _WIN32
@@ -81,6 +83,7 @@ static void bf_vm_match_bracket(Bf_VM *vm)
                 vm->irs->items[i].operand = da_peek_last(&bp);
                 vm->irs->items[da_pop(&bp)].operand = i;
                 break;
+            default: break;
         }
     }
 
@@ -134,6 +137,7 @@ bool bf_vm_interpret(Bf_VM *vm)
             case IR_ZERO:
                 *ptr = 0;
                 break;
+            default: basic_unreachable();
         }
     }
 
@@ -170,11 +174,11 @@ bool bf_vm_jit_compile(Bf_VM *vm)
                 break;
         }
 
-        memcpy(vm->jit_mem.data + call.pos, &fn, sizeof(fn));
+        memcpy((uint8_t *)vm->jit_mem.data + call.pos, &fn, sizeof(fn));
     }
 
-    void (*program)(void *) = vm->jit_mem.data;
-    program(vm->tape.data);
+    Bf_Program prog = (Bf_Program)vm->jit_mem.data;
+    prog(vm->tape.data);
 
 defer:
     return result;

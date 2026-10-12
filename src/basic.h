@@ -18,6 +18,7 @@
 
 BASICDEF void basic_assert(bool expr, const char *fmt, ...);
 BASICDEF void basic_panic(const char *fmt, ...);
+BASICDEF void basic_unreachable(void);
 
 #define basic_return_defer(value) do {result = (value); goto defer;} while(0)
 // tsoding/nob.h's nob_shift() and nob_shift_args()
@@ -48,9 +49,9 @@ struct Basic_Dynamic_Array {
 
 #define basic_da_reserve(da, new_cap)                                   \
     do {                                                                \
-        if ((da)->capacity < (new_cap)) {                               \
+        if ((da)->capacity < (size_t)(new_cap)) {                       \
             if ((da)->capacity == 0) (da)->capacity = BASIC_DA_INIT_CAP; \
-            while ((da)->capacity < (new_cap)) {                        \
+            while ((da)->capacity < (size_t)(new_cap)) {                \
                 (da)->capacity *= 2;                                    \
             }                                                           \
             (da)->items = BASIC_DECLTYPE((da)->items)realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
@@ -190,6 +191,11 @@ BASICDEF void basic_panic(const char *fmt, ...)
     va_end(ap);
     putc('\n', stderr);
     abort();
+}
+
+BASICDEF void basic_unreachable(void)
+{
+    basic_panic("unreachable");
 }
 
 BASICDEF void basic_sb_append_char(Basic_String_Builder *sb, char c)
