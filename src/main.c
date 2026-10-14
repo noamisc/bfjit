@@ -72,7 +72,7 @@ int main(int argc, char **argv)
     if (command == CMD_INTERPRET || command == CMD_JIT_COMPILE) {
         for (int i = 2; i < argc; i++) {
             if (argv[i][0] == '-') {
-                if (strcmp(argv[1], "--info") == 0) {
+                if (strcmp(argv[i], "--info") == 0) {
                     info = true;
                 }
             } else {
@@ -94,12 +94,14 @@ int main(int argc, char **argv)
     Bf_IRs optimized_irs = {0};
     Errors errors = {0};
 
-    Bf_VM bf_vm = {0};
+    Bf_VM bf_vm;
 
     if (!basic_read_file(path, &source)) {
         bfjit_error("error: unable to read file '%s'", path);
         basic_return_defer(1);
     }
+
+    clock_t compile_start = clock();
 
     bf_irs = generate_bf_irs(sv_from_sb(&source));
     if (!parse_bf_irs(&bf_irs, &errors)) {
@@ -111,6 +113,10 @@ int main(int argc, char **argv)
     optimized_irs = optimize_bf_irs(&bf_irs);
     bf_vm = bf_vm_init(&optimized_irs);
 
+    clock_t compile_end = clock();
+
+    clock_t execution_start = clock();
+
     switch (command) {
         case CMD_INTERPRET:
             bf_vm_interpret(&bf_vm);
@@ -121,11 +127,23 @@ int main(int argc, char **argv)
         default: basic_unreachable();
     }
 
+    clock_t execution_end = clock();
+
+    if (info) {
+        double compile_time = (double)(compile_end - compile_start) / CLOCKS_PER_SEC;
+        double execution_time = (double)(execution_end - execution_start) / CLOCKS_PER_SEC;
+        double total = compile_time + execution_time;
+
+        printf("\n"
+               "Compilation time:       %f\n"
+               "Execution time:         %f\n"
+               "Total:                  %f\n", compile_time, execution_time, total);
+    }
+
 defer:
     if (source.items) sb_free(&source);
     if (bf_irs.items) da_free(&bf_irs);
     if (optimized_irs.items) da_free(&optimized_irs);
     if (errors.items) da_free(&errors);
-    bf_vm_deinit(&bf_vm);
     return result;
 }

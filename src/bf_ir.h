@@ -1,5 +1,5 @@
-#ifndef IR_H_
-#define IR_H_
+#ifndef BFJIT_IR_H_
+#define BFJIT_IR_H_
 
 #include "basic.h"
 #include "error.h"
@@ -12,15 +12,15 @@ typedef struct {
 
 typedef enum {
     IR_NONE,
-    IR_RIGHT = '>',
-    IR_LEFT = '<',
-    IR_ADD = '+',
-    IR_SUB = '-',
-    IR_PUT = '.',
-    IR_GET = ',',
-    IR_JZ = '[',
-    IR_JNZ = ']',
-    IR_ZERO
+    IR_RIGHT        = '>',
+    IR_LEFT         = '<',
+    IR_ADD          = '+',
+    IR_SUB          = '-',
+    IR_PUT          = '.',
+    IR_GET          = ',',
+    IR_JZ           = '[',
+    IR_JNZ          = ']',
+    IR_ZERO,        //  [+] or [-]
 } Bf_IR_Kind;
 
 typedef struct {
@@ -44,4 +44,4 @@ Bf_IRs optimize_bf_irs(Bf_IRs *irs);
 // for debugging purposes
 void dump_bf_irs(Bf_IRs *irs);
 
-#endif // IR_H_
+#endif // BFJIT_IR_H_

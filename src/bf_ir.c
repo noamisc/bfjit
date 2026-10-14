@@ -137,6 +137,7 @@ Bf_IRs optimize_bf_irs(Bf_IRs *irs)
     return result;
 }
 
+// for debugging purposes
 void dump_bf_irs(Bf_IRs *irs)
 {
     for (size_t i = 0; i < irs->count; i++) {

@@ -1,51 +1,59 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include <memoryapi.h>
 #else
 #include <sys/mman.h>
+#endif
+
+#if defined(__APPLE__)
+#include <pthread.h>
+#include <libkern/OSCache.h>
 #endif
 
 #include "bf_vm.h"
 
 typedef void (*Bf_Program)(void *);
 
-static inline bool jit_memory_invalid(Jit_Memory *jit_mem)
+static inline bool bf_code_invalid(Bf_Code *code)
 {
 #ifdef _WIN32
-    return jit_mem->data == NULL;
+    return code->data == NULL;
 #else
-    return jit_mem->data == MAP_FAILED;
+    return code->data == MAP_FAILED;
 #endif
 }
 
-static inline bool jit_memory_alloc(Jit_Memory *jit_mem)
+static inline bool bf_code_alloc(Bf_Code *code)
 {
-#ifdef _WIN32
-    jit_mem->data = VirtualAlloc(NULL, jit_mem->size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+#if defined(_WIN32)
+    code->data = VirtualAlloc(NULL, code->size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+#elif defined(__APPLE__)
+    code->data = mmap(NULL, code->size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT, -1, 0);
 #else
-    jit_mem->data = mmap(NULL, jit_mem->size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    code->data = mmap(NULL, code->size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
-    return !jit_memory_invalid(jit_mem);
+
+    return !bf_code_invalid(code);
 }
 
-static inline bool jit_memory_dealloc(Jit_Memory *jit_mem)
+static inline bool bf_code_free(Bf_Code *code)
 {
-#ifdef _WIN32
-    return VirtualFree(jit_mem->data, 0, MEM_RELEASE) != 0;
+#if defined(_WIN32)
+    return VirtualFree(code->data, 0, MEM_RELEASE) != 0;
 #else
-    return munmap(jit_mem->data, jit_mem->size) == 0;
+    return munmap(code->data, code->size) == 0;
 #endif
 }
 
 static inline bool bf_tape_alloc(Bf_Tape *tape)
 {
-    tape->data = calloc(tape->size, 1);
+    tape->data = calloc(tape->size, sizeof(*tape->data));
     return tape->data != NULL;
 }
 
-static inline void bf_tape_dealloc(Bf_Tape *tape)
+static inline void bf_tape_free(Bf_Tape *tape)
 {
     free(tape->data);
 }
@@ -60,13 +68,11 @@ Bf_VM bf_vm_init(Bf_IRs *irs)
     };
 }
 
-void bf_vm_deinit(Bf_VM *vm)
+static inline void bf_vm_deinit(Bf_VM *vm)
 {
-    if (vm->codegen.call_stack.items) da_free(&vm->codegen.call_stack);
-    if (vm->codegen.code.items) sb_free(&vm->codegen.code);
-    if (!jit_memory_invalid(&vm->jit_mem)) jit_memory_dealloc(&vm->jit_mem);
-    if (vm->tape.data) bf_tape_dealloc(&vm->tape);
-
+    code_free(&vm->g);
+    bf_code_free(&vm->code);
+    bf_tape_free(&vm->tape);
 }
 
 // used by the interpreter
@@ -96,9 +102,8 @@ bool bf_vm_interpret(Bf_VM *vm)
         return false;
     }
 
-    bf_vm_match_bracket(vm);
-
     uint8_t *ptr = vm->tape.data;
+    bf_vm_match_bracket(vm);
 
     for (size_t pc = 0; pc < vm->irs->count; pc++) {
         switch (vm->irs->items[pc].kind) {
@@ -148,10 +153,10 @@ bool bf_vm_jit_compile(Bf_VM *vm)
 {
     bool result = true;
 
-    vm->codegen = generate_code(vm->irs);
-    vm->jit_mem.size = vm->codegen.code.count;
+    vm->g = generate_code(vm->irs);
+    vm->code.size = vm->g.code.count;
 
-    if (!jit_memory_alloc(&vm->jit_mem)) {
+    if (!bf_code_alloc(&vm->code)) {
         basic_return_defer(false);
     }
 
@@ -159,27 +164,37 @@ bool bf_vm_jit_compile(Bf_VM *vm)
         basic_return_defer(false);
     }
 
-    memcpy(vm->jit_mem.data, vm->codegen.code.items, vm->codegen.code.count);
+#if defined(__APPLE__)
+    pthread_jit_write_protect_np(0);
+#endif
 
-    for (size_t i = 0; i < vm->codegen.call_stack.count; i++) {
-        Call call = vm->codegen.call_stack.items[i];
+    memcpy(vm->code.data, vm->g.code.items, vm->g.code.count);
+
+    for (size_t i = 0; i < vm->g.calls.count; i++) {
         uintptr_t fn;
 
-        switch (call.kind) {
+        switch (vm->g.calls.items[i].kind) {
             case CALL_PUT:
                 fn = (uintptr_t)putchar;
                 break;
             case CALL_GET:
                 fn = (uintptr_t)getchar;
                 break;
+            default: basic_unreachable();
         }
 
-        memcpy((uint8_t *)vm->jit_mem.data + call.pos, &fn, sizeof(fn));
+        memcpy((uint8_t *)vm->code.data + vm->g.calls.items[i].pos, &fn, sizeof(fn));
     }
 
-    Bf_Program prog = (Bf_Program)vm->jit_mem.data;
-    prog(vm->tape.data);
+#if defined(__APPLE__)
+    pthread_jit_write_protect_np(1);
+    sys_icache_invalidate(vm->code.data, vm->code.count);
+#endif
+
+    Bf_Program program = (Bf_Program)vm->code.data;
+    program(vm->tape.data);
 
 defer:
+    bf_vm_deinit(vm);
     return result;
 }

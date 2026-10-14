@@ -1,5 +1,5 @@
-#ifndef ERROR_H_
-#define ERROR_H_
+#ifndef BFJIT_ERROR_H_
+#define BFJIT_ERROR_H_
 
 #include "basic.h"
 
@@ -18,4 +18,4 @@ typedef struct {
 void error_print(Error *error, const char *path, String_View source);
 void errors_print(Errors *errors, const char *path);
 
-#endif // ERROR_H_
+#endif // BFJIT_ERROR_H_
