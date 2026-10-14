@@ -74,6 +74,8 @@ int main(int argc, char **argv)
             if (argv[i][0] == '-') {
                 if (strcmp(argv[i], "--info") == 0) {
                     info = true;
+                } else {
+                    bfjit_error_then_exit("error: unrecognized option '%s'", argv[i]);
                 }
             } else {
                 if (!path) {
