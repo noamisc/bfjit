@@ -1,5 +1,5 @@
-#ifndef TARGET_H_
-#define TARGET_H_
+#ifndef BFJIT_TARGET_H_
+#define BFJIT_TARGET_H_
 
 typedef enum {
     OS_UNKNOWN,
@@ -11,10 +11,10 @@ typedef enum {
 typedef enum {
     ARCH_UNKNOWN,
     ARCH_X64,
-    ARCH_AARCH64
+    ARCH_ARM64
 } Arch;
 
 Os get_target_os(void);
 Arch get_target_arch(void);
 
-#endif // TARGET_H_
+#endif // BFJIT_TARGET_H_

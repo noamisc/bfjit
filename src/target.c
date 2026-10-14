@@ -18,7 +18,7 @@ Arch get_target_arch(void)
 #if defined(__x86_64__) || defined(_M_X64)
     return ARCH_X64;
 #elif defined(__aarch64__) || defined(_M_ARM64)
-    return ARCH_AARCH64;
+    return ARCH_ARM64;
 #else
     return ARCH_UNKNOWN;
 #endif
