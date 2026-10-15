@@ -2,4 +2,4 @@
 Simple Brainfsck JIT implementation in C
 
 ## TODO
-- [ ] Support AArch64
+- [x] Support ARM64

@@ -8,8 +8,8 @@
 #endif
 
 #if defined(__APPLE__)
+#include <libkern/OSCacheControl.h>
 #include <pthread.h>
-#include <libkern/OSCache.h>
 #endif
 
 #include "bf_vm.h"
@@ -188,7 +188,7 @@ bool bf_vm_jit_compile(Bf_VM *vm)
 
 #if defined(__APPLE__)
     pthread_jit_write_protect_np(1);
-    sys_icache_invalidate(vm->code.data, vm->code.count);
+    sys_icache_invalidate(vm->code.data, vm->code.size);
 #endif
 
     Bf_Program program = (Bf_Program)vm->code.data;
